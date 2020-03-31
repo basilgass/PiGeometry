@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <title>Getting Started</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/svg.js/3.0.13/svg.min.js"></script>
+
+    <!--<link rel="stylesheet" href="node_modules/katex/dist/katex.min.css">
+    <script src="node_modules/katex/dist/katex.min.js"></script>-->
+
+    <script src="geompi.js"></script>
+</head>
+<body>
+
+<div id="svgOutput" style="width:80vw;height:60vw"></div>
+
+<script>
+    let geom = new PiGeometry('svgOutput', 800, 600);
+    /*geom.showGridOrthoN(16);
+    geom.showGridOrthoN(8);*/
+    //geom.showGridHex(50, {x: 200, y: 200});
+    //geom.showGridOrthoN(8);
+    geom.showGridTri(120);
+    //geom.showGridHex(120);
+
+    geom.grids[0].color('rgba(0,0,0,0.4)').width(0.5);
+    /*geom.grids[1].color('rgba(0,0,0,0.4)').width(2).dash('10 5 10 5');*/
+
+    let p = geom.grids[0].getOrigin(),
+        p1 = geom.grids[0].getPoint({x:2, y:4});
+    p2 = geom.grids[0].getPoint({x:-1, y:-3}, p1);
+    let C = geom.draw.circle(80).cx(p2.x).cy(p2.y).stroke({width: 1, color: 'black'}).fill('rgba(200,0,200,0.5)');
+    geom.makeDraggable(C, geom.mainGrid);
+</script>
+</body>
+</html>
