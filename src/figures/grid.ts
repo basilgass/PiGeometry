@@ -8,6 +8,7 @@ export class Grid {
     private _group: G;
     private _intersectionsPoints: G;
     private _gridData: {width: number, height: number, type: number};
+    private _origin: IPoint;
 
     constructor(gPi: GeometryPi) {
         this._geometryPi = gPi;
@@ -127,7 +128,16 @@ export class Grid {
      * Coordinate functions
      */
     getOrigin = ():IPoint => {
-        return {x: 0, y: this._geometryPi.height};
+        if(this._origin===undefined) {
+            return {x: 0, y: this._geometryPi.height};
+        }else{
+            return this._origin;
+        }
+    };
+
+    setOrigin = (x: number, y:number):Grid => {
+        this._origin = this.getPoint({x, y}, {x:0, y:this._geometryPi.height});
+        return this;
     };
 
     getPoint = (direction:IPoint, origin?: IPoint):IPoint => {

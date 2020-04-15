@@ -17,6 +17,6 @@ module.exports = {
     },
     output: {
         filename: 'geompi.js',
-        path: path.resolve(__dirname, 'distStatic'),
+        path: path.resolve(__dirname, 'distStatic')
     }
 };
