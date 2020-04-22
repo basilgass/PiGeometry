@@ -1,0 +1,334 @@
+import {GeometryPi, IPoint} from "./GeometryPi";
+import {Marker, Shape, Element} from "@svgdotjs/svg.js";
+import {vecCalc} from "./vecCalc";
+import {Point} from "./figures/Point";
+import {Figure} from "./figures/Figure";
+import {Line} from "./figures/Line";
+
+export interface IFigure {
+    name: string,
+    type: string
+    data: {[key: string]: any},
+    shape: Shape,
+    dragShape: Shape
+}
+
+export class Figures {
+    private _geometryPi: GeometryPi;
+    private _figures: Figure[];
+    private _points: {[key: string]:IPoint};
+
+    private _arrowScale: number;
+    private _startArrow: Marker;
+    private _endArrow: Marker;
+    constructor(gPi: GeometryPi) {
+        this._geometryPi = gPi;
+        this._figures = [];
+        this._points = {};
+
+        /* Create the arrows */
+        this._arrowScale = 10;
+        this._createMarker(this._arrowScale);
+
+        return this;
+    }
+
+    /* Managing the points */
+    addPoint(pt:IPoint):Figures{
+        if(pt.name===undefined){
+            pt.name = this._pointAutoName();
+        }
+
+        this._points[pt.name] = {
+            x: pt.x,
+            y: pt.y,
+            name: pt.name
+        };
+
+        // Add the Point to the figures
+        this._point(pt.name, ['', pt.name, pt.x.toString(), pt.y.toString()]);
+
+        return this;
+    }
+
+    emptyPoint():IPoint{
+        return {x:0,y:0};
+    }
+
+    addDefaultPoint(name:string):Figures {
+        if(!(name in this._points)){
+            return this.addPoint({x: 0, y: 0, name: name});
+        }
+        return this;
+    }
+
+    private _createMarker(scale: number){
+        // TODO: Start arrow must be revert !
+        this._startArrow  = this._geometryPi.draw.marker(
+                scale,
+                scale,
+                function (add) {
+                    add.path(`M1,0 L1,${scale}, L${scale * 1.2},${scale / 2} L1,0z`)
+                }).ref(scale, scale / 2);
+        this._endArrow = this._geometryPi.draw.marker(
+                scale,
+                scale,
+                function (add) {
+                    add.path(`M1,0 L1,${scale}, L${scale * 1.2},${scale / 2} L1,0z`)
+                }).ref(scale, scale / 2);
+    }
+    private _pointAutoName(index?:number):string{
+        let letter:string, letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+        for(let i=0; i<letters.length; i++){
+            if(!((index===undefined?letters[i]:letters[i]+index) in this._points)){
+                return letters[i];
+            }
+        }
+        return this._pointAutoName(index===undefined?1:index+1);
+    }
+
+    /* Construction methods */
+    constructionStringList():{[key: string]:string}{
+        return {
+            '[AB]': 'Segment AB',
+            '[AB[': 'Half-rule from A through B',
+            ']AB[': 'Rule throuhg A and B',
+            'vAB': 'Vector AB'
+        }
+    }
+
+    addFigure(str: string):Figures{
+        let r:RegExpMatchArray[];
+
+        // Simple Point
+        r = [...str.matchAll(/([A-Z][0-9]*)\(([0-9\.]+),([0-9\.]+)\)/g)];
+        if(r.length===1){
+            return this._point(str, r[0]);
+        }
+
+        // Line
+        r = [...str.matchAll(/\]([A-Z][0-9]*)([A-Z][0-9]*)\[/g)];
+        if(r.length===1){
+            console.log(`A line through ${r[0][1]} and ${r[0][2]}`);
+            return this._line(str, r[0]);
+        }
+
+        // Segment
+        r = [...str.matchAll(/\[([A-Z][0-9]*)([A-Z][0-9]*)\]/g)];
+        if(r.length===1){
+            console.log(`A segment from ${r[0][1]} to ${r[0][2]}`);
+            return this._segment(str, r[0]);
+        }
+
+        // Half-rule
+        r = [...str.matchAll(/\[([A-Z][0-9]*)([A-Z][0-9]*)\[/g)];
+        if(r.length===1){
+            console.log(`A half-rule from ${r[0][1]} through ${r[0][2]}`);
+            return this._line(str, r[0], true);
+        }
+
+        // Vector
+        r = [...str.matchAll(/v([A-Z][0-9]*)([A-Z][0-9]*)/g)];
+        if(r.length===1){
+            console.log(`A vector from ${r[0][1]} to ${r[0][2]}`);
+            return this._segment(str, r[0], true)
+        }
+
+        // Circle
+        r = [...str.matchAll(/c([A-Z][0-9]*),([A-Z][0-9]*)([A-Z][0-9]*)/g)];
+        if(r.length===1){
+            console.log(`A circle centered on ${r[0][1]} and radius of ${r[0][2]}${r[0][3]}`)
+            return this._circle(str, r[0]);
+        }
+
+        // Arc
+
+        // Polygon
+
+        // What else ?
+
+        return this;
+    }
+
+    private _slope(p1:IPoint, p2: IPoint):number{
+        let dx: number, dy: number;
+
+        dx = p2.x-p1.x;
+        dy = p2.y-p1.y;
+
+        // Vertical
+        if(dx===0){
+            return Infinity;
+        }
+
+        // Horizontal
+        if(dy===0){
+            return 0;
+        }
+
+        // Oblique
+        return dy/dx;
+    }
+
+    private _getLinePosAtX(x:number, p1:IPoint, p2:IPoint):IPoint{
+        let slope = this._slope(p1, p2);
+
+        if(slope!==Infinity) {
+            return {
+                x,
+                y: x*slope+(p1.y - p1.x * slope)
+            };
+        }else{
+            return {
+                x,
+                y: 0
+            };
+        }
+    }
+
+    private _checkPoint(strReq:RegExpMatchArray, id:number):string{
+        let p = strReq[id];
+
+        this.addDefaultPoint(p);
+        return p;
+    }
+    private _checkTwoPoints(strReg:RegExpMatchArray):{p1:string,p2:string} {
+        return {
+            p1: this._checkPoint(strReg, 1),
+            p2: this._checkPoint(strReg, 2)
+        };
+    }
+    private _checkThreePoints(strReg:RegExpMatchArray):{p1:string,p2:string, p3:string} {
+        return {
+            p1: this._checkPoint(strReg, 1),
+            p2: this._checkPoint(strReg, 2),
+            p3: this._checkPoint(strReg, 3),
+        };
+    }
+
+    private _point(name: string, strReg:RegExpMatchArray):Figures {
+        let p = this._checkPoint(strReg, 1),
+        x = +strReg[2], y = +strReg[3],
+            scale = 6;
+
+        this._figures.push(
+            new Point(this._geometryPi, name, x, y)
+        );
+        return this;
+/*
+        this._figures.push({
+            name,
+            type: 'Point',
+            data: {x, y},
+            shape: this._geometryPi.draw.path(
+                `M${x - scale},${y - scale}L${x + scale},${y + scale}M${x + scale},${y - scale}L${x - scale},${y + scale}`).stroke('black'),
+            dragShape: null
+        })
+        return this;*/
+    }
+
+    private _segment(name: string, strReg:RegExpMatchArray, endArrow: Boolean=false, startArrow: Boolean = false):Figures {
+        let {p1, p2} = this._checkTwoPoints(strReg);
+
+        this._figures.push(
+            new Line(this._geometryPi, name, p1, p2, true)
+        );
+
+        return this;
+        /*this._figures.push({
+            name: name,
+            type: 'segment',
+            data: {p1, p2, startArrow, endArrow},
+            shape: this._geometryPi.draw.Line(
+                this._points[p1].x,
+                this._points[p1].y,
+                this._points[p2].x,
+                this._points[p2].y,
+            ).stroke({width: 1, color: 'black'}),
+            dragShape: null
+        });
+
+        if(endArrow){
+            console.log('ADD VECTOR');
+            // @ts-ignore
+            this._figures[this._figures.length-1].shape.marker('end', this._endArrow);
+        }
+
+        return this;*/
+    }
+
+    private _line(name: string, strReg:RegExpMatchArray, halfRule:Boolean=false):Figures {
+        let {p1, p2} = this._checkTwoPoints(strReg),
+            l1: IPoint, l2: IPoint, delta = this._slope(this._points[p1], this._points[p2]);
+
+        this._figures.push(
+            new Line(this._geometryPi, name, this._points[p1], this._points[p2], halfRule, false)
+        );
+        return this;
+
+        /*
+        if(halfRule===true){
+            l1 = this._points[p1];
+            if(this._points[p1].x<this._points[p2].x){
+                l2 = this._getLinePosAtX(this._geometryPi.width, this._points[p1], this._points[p2]);
+            }else{
+                l2 = this._getLinePosAtX(0, this._points[p1], this._points[p2]);
+            }
+        }else {
+            l1 = this._getLinePosAtX(0, this._points[p1], this._points[p2]);
+            l2 = this._getLinePosAtX(this._geometryPi.width, this._points[p1], this._points[p2]);
+        }
+
+        this._figures.push({
+            name,
+            type: 'Line',
+            data: {p1, p2, halfRule},
+            shape: this._geometryPi.draw.Line(
+                l1.x, l1.y, l2.x, l2.y
+            ).stroke({width: 1, color: 'black'}),
+            dragShape: null
+        });
+
+        return this;*/
+    }
+
+    private _circle(name: string, strReg:RegExpMatchArray):Figures {
+        let {p1, p2, p3} = this._checkThreePoints(strReg),
+            radius = vecCalc.distance(this._points[p2], this._points[p3]);
+
+        this._figures.push({
+            name,
+            type: 'circle',
+            data: {p1, p2, p3},
+            shape: this._geometryPi.draw
+                .circle(radius*2)
+                .center(this._points[p1].x, this._points[p1].y)
+                .stroke({width: 1, color: 'black'})
+                .fill('transparent'),
+            dragShape: null
+        })
+        return this;
+    }
+
+    update():Figures {
+
+        return this;
+    }
+
+    /* Get figures function */
+    getPoint(name: string):IPoint{
+        return (name in this._points)?this._points[name]:this.emptyPoint();
+    }
+
+    getFigure(name: string):IFigure{
+        for(let f of this._figures){
+            if(f.name===name){
+                console.log(`Figure ${name} found.`);
+                return f;
+            }
+        }
+        return null;
+    }
+
+}

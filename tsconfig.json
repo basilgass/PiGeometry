@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "outDir": "./dist/",
+    "outDir": "./distStatic/",
     "noImplicitAny": true,
     "module": "esnext",
     "target": "esnext",

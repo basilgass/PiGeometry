@@ -1,6 +1,6 @@
-import {GeometryPi, IPoint} from "../GeometryPi";
+import {GeometryPi, IPoint} from "./GeometryPi";
 import {G, Line, Path, Polygon, Svg} from "@svgdotjs/svg.js";
-
+import {Axis} from "./Axis";
 
 export class Grid {
     private _geometryPi: GeometryPi;
@@ -10,6 +10,8 @@ export class Grid {
     private _gridData: {width: number, height: number, type: number};
     private _origin: IPoint;
 
+    private _axis: Axis;
+
     constructor(gPi: GeometryPi) {
         this._geometryPi = gPi;
         this._group = this._geometryPi.draw.group();
@@ -18,6 +20,7 @@ export class Grid {
             height: 0,
             type: 0
         };
+        this._axis = null;
 
         return this;
     };
@@ -25,7 +28,6 @@ export class Grid {
     /**
      * Grid styles
      */
-
     triangle = (triangleWidth: number): Grid => {
         let w = this._geometryPi.width,
             h = this._geometryPi.height,
@@ -136,7 +138,10 @@ export class Grid {
     };
 
     setOrigin = (x: number, y:number):Grid => {
-        this._origin = this.getPoint({x, y}, {x:0, y:this._geometryPi.height});
+        this._origin = this.getPoint(
+            {x, y},
+            {x:0, y:this._geometryPi.height}
+            );
         return this;
     };
 
@@ -170,7 +175,6 @@ export class Grid {
 
     private _getPointHex = (direction:IPoint, origin: IPoint):IPoint => {
         let pt: IPoint;
-
         return{
             x: origin.x + (direction.x),
             y: origin.x + (direction.x)
@@ -211,6 +215,18 @@ export class Grid {
     }
 
     /**
+     * Axis
+     */
+    showAxis():Grid{
+        if(this._axis===null){
+            this._axis = new Axis(this._geometryPi);
+        }
+
+        this._axis.show();
+        return this;
+    }
+
+    /**
      * Grid style options
      */
     color(value:string):Grid{
@@ -245,6 +261,19 @@ export class Grid {
 
     set stroke(value: string){
         this._group.stroke(value);
+    }
+
+    get maxX():number{
+        return (this._geometryPi.width-this._origin.x)/this._gridData.width;
+    }
+    get minX():number{
+        return -this._origin.x/this._gridData.width;
+    }
+    get maxY():number{
+        return this._origin.y/this._gridData.height;
+    }
+    get minY():number{
+        return -(this._geometryPi.height - this._origin.y)/this._gridData.height;
     }
 
 }
